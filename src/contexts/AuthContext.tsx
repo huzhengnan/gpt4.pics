@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'; // Import useCallback
-import { useRouter } from 'next/navigation';
 // 导入 userService 中定义的扁平化用户类型
 import type { UserWithBalance } from '@/lib/services/userService'; // 注意: 路径可能需要根据实际结构调整
 
@@ -25,7 +24,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // 初始加载状态
-  const router = useRouter(); // Router for potential redirects
 
   // 获取当前登录用户信息的方法 (调用 API)
   const fetchCurrentUser = useCallback(async () => { // useCallback 防止在 Effect 中不必要的重定义

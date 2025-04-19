@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { UserService } from '@/lib/services/userService';
+import { NextResponse } from 'next/server';
 import { AuthCookieService } from '@/lib/services/authCookieService';
+import { UserService } from '@/lib/services/userService';
 
 const userService = new UserService();
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const token = await AuthCookieService.getAuthToken();
         

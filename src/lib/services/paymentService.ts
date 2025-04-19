@@ -4,7 +4,12 @@ import { CouponRepository } from '../db/repositories/couponRepository';
 import { CouponUsageRepository } from '../db/repositories/couponUsageRepository';
 // Translate comment to English
 import { CreditAccountRepository } from '../db/repositories/creditAccountRepository'; // Used to add credits after successful purchase
-import { PaymentOrder, Prisma } from '@prisma/client';
+import { PaymentOrder, Prisma, OrderStatus, CreditTransactionType, CouponDiscountType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
+import { CreemService } from './third-party/creemService';
+
+const prisma = new PrismaClient();
 
 export class PaymentService {
   private orderRepo: PaymentOrderRepository;
@@ -12,6 +17,7 @@ export class PaymentService {
   private couponRepo: CouponRepository;
   private couponUsageRepo: CouponUsageRepository;
   private creditRepo: CreditAccountRepository; // Inject CreditAccountRepository
+  private creemService: CreemService;
 
   constructor() {
     this.orderRepo = new PaymentOrderRepository();
@@ -20,9 +26,10 @@ export class PaymentService {
     this.couponUsageRepo = new CouponUsageRepository();
     // Translate comment to English
     this.creditRepo = new CreditAccountRepository(); // Initialize
+    this.creemService = new CreemService();
   }
 
-  async createPaymentOrder(userId: string, planId: string, couponCode?: string): Promise<{ order: PaymentOrder, finalAmount: Prisma.Decimal }> {
+  async createPaymentOrder(userId: string, planId: string, couponCode?: string): Promise<{ order: PaymentOrder, finalAmount: Prisma.Decimal, paymentUrl: string }> {
     const plan = await this.planRepo.findById(planId);
     if (!plan || !plan.isActive) {
       // Translate error message to English
@@ -55,9 +62,9 @@ export class PaymentService {
       //   throw new Error('You have already used this coupon');
       // }
 
-      if (coupon.discountType === 'fixed') {
+      if (coupon.discountType === CouponDiscountType.FIXED_AMOUNT) {
         discountAmount = coupon.discountValue;
-      } else if (coupon.discountType === 'percentage') {
+      } else if (coupon.discountType === CouponDiscountType.PERCENTAGE) {
         discountAmount = plan.price.mul(coupon.discountValue).div(100);
       }
       
@@ -70,14 +77,14 @@ export class PaymentService {
     }
 
     // Translate comment to English
-    const orderNumber = `ORDER-${Date.now()}-${userId.substring(0, 4)}`; // Simple order number generation
+    const orderNumber = `ORDER-${uuidv4()}`;
 
     const order = await this.orderRepo.create({
         userId,
         planId: plan.id,
         amount: finalAmount,
         credits: plan.credits,
-        status: 'pending',
+        status: OrderStatus.PENDING,
         orderNumber: orderNumber,
         // paymentMethod and paymentId are updated after successful payment
         paymentMethod: null,
@@ -96,26 +103,72 @@ export class PaymentService {
       await this.couponRepo.incrementUsage(couponId);
     }
 
-    return { order, finalAmount };
+    // 使用 CreemService 创建支付链接
+    const checkoutSession = await this.creemService.createCheckoutSession(order.id, {
+      userId,
+      orderId: order.id,
+      planId: plan.id
+    });
+
+    return { 
+      order, 
+      finalAmount, 
+      paymentUrl: checkoutSession.checkout_url 
+    };
   }
 
-  async completePayment(orderId: string, paymentId: string, paymentMethod: string): Promise<PaymentOrder> {
-    const order = await this.orderRepo.findById(orderId);
-    if (!order || order.status !== 'pending') {
-      // Translate error message to English
-      throw new Error('Invalid order or incorrect order status');
+  async handlePaymentSuccess(orderId: string, paymentId: string) {
+    const order = await prisma.paymentOrder.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.COMPLETED,
+        paymentId,
+        completedAt: new Date(),
+      },
+      include: {
+        plan: true,
+      },
+    });
+
+    if (!order.plan) {
+      throw new Error('Plan not found for order');
     }
 
-    // Call CreditAccountRepository to add credits
-    // Translate description string to English using template literal
-    await this.creditRepo.addCredits(order.userId, order.credits, 'purchase', `Purchase plan: ${order.planId}`, order.id);
+    // 更新用户信用账户
+    const creditAccount = await prisma.creditAccount.upsert({
+      where: { userId: order.userId },
+      create: {
+        userId: order.userId,
+        balance: order.plan.credits,
+        totalEarned: order.plan.credits,
+      },
+      update: {
+        balance: {
+          increment: order.plan.credits,
+        },
+        totalEarned: {
+          increment: order.plan.credits,
+        },
+      },
+    });
 
-    // Update order status
-    return this.orderRepo.updateStatus(orderId, 'completed', paymentId);
+    // 创建信用交易记录
+    await prisma.creditTransaction.create({
+      data: {
+        userId: order.userId,
+        amount: order.plan.credits,
+        type: CreditTransactionType.PURCHASE,
+        description: `Purchase of ${order.plan.name} plan`,
+        referenceId: order.id,
+        balanceAfter: creditAccount.balance + order.plan.credits,
+      },
+    });
+
+    return order;
   }
 
-  async failPayment(orderId: string): Promise<PaymentOrder> {
-    return this.orderRepo.updateStatus(orderId, 'failed');
+  async handlePaymentFailure(orderId: string) {
+    return this.orderRepo.updateStatus(orderId, OrderStatus.FAILED);
   }
 
   async getUserOrders(userId: string): Promise<PaymentOrder[]> {

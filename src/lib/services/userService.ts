@@ -1,6 +1,6 @@
 import { UserRepository } from '../db/repositories/userRepository';
 // Import Prisma types directly if needed elsewhere, or rely on UserRepository's return types
-import type { User as PrismaUser, Prisma } from '@prisma/client';
+import type { User as PrismaUser } from '@prisma/client';
 import crypto from 'crypto';
 
 // 定义扩展后的 User 类型，与 UserRepository 返回的结构对齐
@@ -83,7 +83,7 @@ export class UserService {
       if (!userFromRepo) {
           return null;
       }
-      const { passwordHash, creditAccount, ...restOfUser } = userFromRepo; // Destructure to remove sensitive/nested fields
+      const { creditAccount, ...restOfUser } = userFromRepo; // Destructure to remove nested fields
       return {
           ...restOfUser, // Include all other user fields
           balance: creditAccount?.balance ?? 0, // Extract balance, default to 0
@@ -104,14 +104,11 @@ export class UserService {
            return { success: false, message: 'Username already taken' };
        }
 
-      // 哈希密码
-      const passwordHash = this.hashPassword(data.password);
-
       // 创建用户 (UserRepository 返回带 creditAccount 的用户)
       const newUserFromRepo = await this.userRepo.create({
         email: data.email,
         username: data.username,
-        passwordHash,
+        passwordHash: this.hashPassword(data.password),
         // Set default values for other fields as needed by your DB schema/logic
         avatarUrl: null,
         googleId: null, // Ensure these can be null in your schema
@@ -123,10 +120,10 @@ export class UserService {
 
       // 注册成功通常不直接返回用户信息给前端 API，但保持内部一致性
       return { success: true, user: formattedUser ?? undefined }; // Return formatted user or undefined
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration service error:', error);
       // More specific error handling based on Prisma errors could be added
-      return { success: false, message: error.message || 'An error occurred during registration' };
+      return { success: false, message: error instanceof Error ? error.message : 'An error occurred during registration' };
     }
   }
 
@@ -152,9 +149,9 @@ export class UserService {
       }
 
       return { success: true, user: formattedUser }; // 返回扁平化的 UserWithBalance
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login service error:', error);
-      return { success: false, message: error.message || 'An error occurred during login' };
+      return { success: false, message: error instanceof Error ? error.message : 'An error occurred during login' };
     }
   }
 
@@ -198,17 +195,15 @@ export class UserService {
        // Format the result
        const formattedUser = this.formatUserWithBalance(userFromRepo);
        if (!formattedUser) {
-            // This implies findOrCreateOAuthUser failed or returned null unexpectedly
-            return { success: false, message: 'Failed to process OAuth user data' };
+         return { success: false, message: 'Failed to format user data after OAuth login' };
        }
 
-
-       return { success: true, user: formattedUser }; // Return formatted user
-     } catch (error: any) {
+       return { success: true, user: formattedUser };
+     } catch (error: unknown) {
        console.error('OAuth login service error:', error);
-       return { success: false, message: error.message || 'An error occurred during OAuth login' };
+       return { success: false, message: error instanceof Error ? error.message : 'An error occurred during OAuth login' };
      }
-   }
+  }
 
   // 获取用户余额 (保持不变，直接返回数字)
   async getUserBalance(userId: string): Promise<number> {

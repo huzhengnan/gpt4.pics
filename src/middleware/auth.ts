@@ -58,6 +58,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     // 令牌无效，清除cookie并重定向到登录页面
+    console.error('Token verification failed:', error);
     const response = NextResponse.redirect(
       new URL('/auth/login', request.url)
     );

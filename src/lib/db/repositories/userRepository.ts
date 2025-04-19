@@ -3,9 +3,7 @@ import prisma from './index'
 import type { User, Prisma } from '@prisma/client'
 
 // 定义创建用户时需要的数据类型，确保与 Prisma 生成的类型一致或兼容
-// 使用 Prisma.UserCreateInput 通常更安全，但如果需要自定义，确保包含所有必需字段
-type UserCreateInput = Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'emailVerified' | 'creditAccount' | 'creditTransactions' | 'paymentOrders' | 'couponUsages' | 'imageGenerations'>
-
+type UserCreateInput = Prisma.UserCreateInput
 
 // 定义更新用户时可能需要的数据类型
 // 使用 Prisma.UserUpdateInput 也是一个好选择
@@ -109,15 +107,11 @@ export class UserRepository {
       const usernameBase = name || email.split('@')[0] || `user_${Date.now()}`;
       // Ensure username is unique if required by schema (needs check+modification logic)
       // For simplicity, assuming direct creation works or username clashes are handled elsewhere/unlikely
-       let username = usernameBase;
-        // Add logic here to ensure username uniqueness if needed, e.g., append numbers
-        // const existingUsername = await this.findByUsername(username);
-        // if (existingUsername) { username = `${usernameBase}_${crypto.randomBytes(4).toString('hex')}`; }
-
+      const username = usernameBase;
 
       const createData: Prisma.UserCreateInput = {
           email: email,
-          username: username, // Use potentially modified unique username
+          username: username,
           avatarUrl: avatarUrl,
           passwordHash: null, // No password for OAuth users initially
           ...(provider === 'google' ? { googleId: providerId } : { githubId: providerId }),
@@ -126,10 +120,7 @@ export class UserRepository {
               create: {}
           }
       };
-      // We don't need UserCreateInput type here as we use Prisma.UserCreateInput
-      // The create method below will include the creditAccount
-      return this.create(createData as any); // Using 'as any' to bypass strict type checking if UserCreateInput conflicts
-                                             // Or adjust types carefully. Prisma.UserCreateInput is safer.
+      return this.create(createData);
    }
 
 

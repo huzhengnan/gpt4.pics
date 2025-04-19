@@ -35,8 +35,8 @@ export default function Header() {
             </Link>
           </div>
           
-          <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-            <Link 
+        <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            {/* <Link 
               href="/" 
               className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200 ${
                 pathname === '/' 
@@ -45,8 +45,8 @@ export default function Header() {
               }`}
             >
               Home
-            </Link>
-            <Link 
+            </Link>  */}
+            {/* <Link 
               href="/gallery" 
               className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200 ${
                 pathname === '/gallery' 
@@ -55,6 +55,17 @@ export default function Header() {
               }`}
             >
               Gallery
+            </Link> */}
+             {/* Add Pricing Link */}
+             <Link
+               href="/pricing"
+               className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200 ${
+                 pathname === '/pricing'
+                   ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500'
+                   : 'text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+               }`}
+            >
+              Pricing
             </Link>
           </div>
 

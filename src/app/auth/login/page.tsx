@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 // 1. Import useAuth hook
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function LoginPage() {
+function LoginForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -148,5 +148,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

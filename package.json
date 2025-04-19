@@ -12,15 +12,19 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.2",
+    "@heroicons/react": "^2.2.0",
     "@prisma/client": "^6.6.0",
     "@supabase/supabase-js": "^2.49.4",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
+    "axios": "^1.8.4",
     "jsonwebtoken": "^9.0.2",
     "next": "15.3.0",
     "postcss": "^8.5.3",
     "prisma": "^6.6.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

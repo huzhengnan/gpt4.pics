@@ -5,6 +5,7 @@ import { Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function UserMenu() {
   // Get user, logout, and isAuthenticated directly from AuthContext
@@ -41,7 +42,13 @@ export default function UserMenu() {
           <div className="flex items-center space-x-3">
             <div className="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center text-white">
               {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user?.username ?? ''} className="h-8 w-8 rounded-full" />
+                <Image
+                  src={user.avatarUrl}
+                  alt={user?.username ?? ''}
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full"
+                />
               ) : (
                 <span className="text-sm font-medium">{user?.username?.charAt(0).toUpperCase()}</span>
               )}

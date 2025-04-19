@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+项目网址：gpt4.pics
+[struct.txt](mdc:src/struct/struct.txt)
+网站结构参考
+网站内容用英文

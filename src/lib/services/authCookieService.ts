@@ -59,6 +59,7 @@ export class AuthCookieService {
         username: string;
       };
     } catch (error) {
+      console.error('Token verification failed:', error);
       return null;
     }
   }
