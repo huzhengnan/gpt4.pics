@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Define Enums for status and type fields
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImageGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  USAGE
+  REFUND
+  ADJUSTMENT
+  REWARD
+}
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid // Use default UUID
+  email         String    @unique // Add unique email field
+  emailVerified DateTime? @map("email_verified") // Add email verification tracking
+  username      String?   @unique
+  passwordHash  String?   @map("password_hash") // Add field for hashed password (optional if only 3rd party)
+  avatarUrl     String?   @map("avatar_url")
+  googleId      String?   @unique @map("google_id") // Optional: Unique ID from Google
+  githubId      String?   @unique @map("github_id") // Optional: Unique ID from GitHub
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz // Use @updatedAt for auto-update
+
+  // Define relationships to other user-related models
+  creditAccount      CreditAccount?      @relation("UserCreditAccount") // One-to-one relation
+  creditTransactions CreditTransaction[] @relation("UserCreditTransactions")
+  paymentOrders      PaymentOrder[]      @relation("UserPaymentOrders")
+  couponUsages       CouponUsage[]       @relation("UserCouponUsages")
+  imageGenerations   ImageGeneration[]   @relation("UserImageGenerations")
+
+  @@map("users") // Map to the "users" table in the database
+}
+
+model CreditAccount {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  balance     Int      @default(0)
+  totalEarned Int      @default(0) @map("total_earned")
+  totalSpent  Int      @default(0) @map("total_spent")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz // Corrected: Use @updatedAt
+
+  user User @relation("UserCreditAccount", fields: [userId], references: [id], onDelete: Cascade) // Added relation back to User
+
+  @@map("credit_accounts")
+}
+
+model CreditTransaction {
+  id           String                @id @default(uuid()) @db.Uuid
+  userId       String                @map("user_id") @db.Uuid
+  amount       Int
+  balanceAfter Int                   @map("balance_after")
+  type         CreditTransactionType // Changed to Enum
+  description  String?               @db.Text
+  referenceId  String?               @map("reference_id") // Could be PaymentOrder ID, ImageGeneration ID, etc.
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation("UserCreditTransactions", fields: [userId], references: [id], onDelete: Cascade) // Added relation back to User
+
+  @@index([userId]) // Added index for faster lookups by user
+  @@index([referenceId]) // Added index for faster lookups by reference
+  @@map("credit_transactions")
+}
+
+model PricingPlan {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String         @db.Text
+  credits     Int
+  price       Decimal        @db.Decimal(10, 2)
+  isPopular   Boolean        @default(false) @map("is_popular")
+  isActive    Boolean        @default(true) @map("is_active")
+  description String?        @db.Text
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz // Corrected: Use @updatedAt
+  orders      PaymentOrder[]
+
+  @@map("pricing_plans")
+}
+
+model PaymentOrder {
+  id            String      @id @default(uuid()) @db.Uuid
+  orderNumber   String      @unique @map("order_number")
+  userId        String      @map("user_id") @db.Uuid
+  planId        String?     @map("plan_id") @db.Uuid
+  amount        Decimal     @db.Decimal(10, 2) // Total amount after potential discount
+  credits       Int // Credits granted by this order
+  status        OrderStatus // Changed to Enum
+  paymentMethod String?     @map("payment_method")
+  paymentId     String?     @map("payment_id") // ID from payment provider (e.g., Stripe Charge ID)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz // Corrected: Use @updatedAt
+  completedAt   DateTime?   @map("completed_at") @db.Timestamptz
+
+  user         User          @relation("UserPaymentOrders", fields: [userId], references: [id], onDelete: Restrict) // Added relation back to User
+  plan         PricingPlan?  @relation(fields: [planId], references: [id], onDelete: SetNull) // onDelete: SetNull if plan is deleted
+  couponUsages CouponUsage[] // Relation to coupon usages for this order
+
+  @@index([userId]) // Added index
+  @@index([planId]) // Added index
+  @@map("payment_orders")
+}
+
+model Coupon {
+  id             String             @id @default(uuid()) @db.Uuid
+  code           String             @unique
+  discountType   CouponDiscountType @map("discount_type") // Changed to Enum
+  discountValue  Decimal            @map("discount_value") @db.Decimal(10, 2) // Percentage or fixed amount
+  minPurchase    Decimal            @default(0) @map("min_purchase") @db.Decimal(10, 2)
+  maxUses        Int?               @map("max_uses") // Max total uses for this coupon
+  usesCount      Int                @default(0) @map("uses_count")
+  maxUsesPerUser Int?               @default(1) @map("max_uses_per_user") // Add max uses per user
+  startDate      DateTime?          @map("start_date") @db.Timestamptz
+  endDate        DateTime?          @map("end_date") @db.Timestamptz
+  isActive       Boolean            @default(true) @map("is_active")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz // Corrected: Use @updatedAt
+  couponUsages   CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id             String   @id @default(uuid()) @db.Uuid
+  couponId       String   @map("coupon_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  orderId        String   @unique @map("order_id") @db.Uuid // An order should only use one coupon, make it unique
+  discountAmount Decimal  @map("discount_amount") @db.Decimal(10, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  coupon Coupon       @relation(fields: [couponId], references: [id], onDelete: Restrict) // Relation back to Coupon
+  user   User         @relation("UserCouponUsages", fields: [userId], references: [id], onDelete: Cascade) // Relation back to User
+  order  PaymentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade) // Relation back to Order
+
+  @@unique([couponId, userId]) // A user can use a specific coupon only once, adjust if needed
+  @@index([userId]) // Added index
+  @@index([couponId]) // Added index
+  // @@unique([couponId, orderId]) is removed because orderId relation is now 1-to-1 (unique)
+  @@map("coupon_usages")
+}
+
+model ImageGeneration {
+  id             String                @id @default(uuid()) @db.Uuid
+  userId         String                @map("user_id") @db.Uuid
+  prompt         String                @db.Text
+  negativePrompt String?               @map("negative_prompt") @db.Text // Optional: Add negative prompt
+  size           String // e.g., "1024x1024"
+  stylePreset    String?               @map("style_preset") // Optional: Specify style
+  numOutputs     Int                   @default(1) @map("num_outputs") // Optional: Number of images generated
+  outputUrls     String[]              @map("output_urls") // Store multiple URLs if numOutputs > 1
+  // imageUrl      String?   @map("image_url") // Replaced by outputUrls
+  creditsUsed    Int                   @default(1) @map("credits_used")
+  status         ImageGenerationStatus // Changed to Enum
+  errorMessage   String?               @map("error_message") @db.Text
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  completedAt    DateTime?             @map("completed_at") @db.Timestamptz
+
+  user User @relation("UserImageGenerations", fields: [userId], references: [id], onDelete: Cascade) // Added relation back to User
+
+  @@index([userId]) // Added index
+  @@map("image_generations")
+}
