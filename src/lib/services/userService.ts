@@ -94,7 +94,7 @@ export class UserService {
   // 用户注册方法 (返回 AuthResult)
   async register(data: RegisterInput): Promise<AuthResult> {
     try {
-       // 检查邮箱或用户名是否已存在
+       // Check if email or username already exists
        const existingEmail = await this.userRepo.findByEmail(data.email);
        if (existingEmail) {
          return { success: false, message: 'Email already in use' };
@@ -104,25 +104,27 @@ export class UserService {
            return { success: false, message: 'Username already taken' };
        }
 
-      // 创建用户 (UserRepository 返回带 creditAccount 的用户)
+      // Create user with initial credit account
       const newUserFromRepo = await this.userRepo.create({
         email: data.email,
         username: data.username,
         passwordHash: this.hashPassword(data.password),
-        // Set default values for other fields as needed by your DB schema/logic
         avatarUrl: null,
-        googleId: null, // Ensure these can be null in your schema
-        githubId: null
+        googleId: null,
+        githubId: null,
+        creditAccount: {
+          create: {
+            balance: 50,
+            totalEarned: 50
+          }
+        }
       });
 
-      // 格式化用户数据
       const formattedUser = this.formatUserWithBalance(newUserFromRepo);
 
-      // 注册成功通常不直接返回用户信息给前端 API，但保持内部一致性
-      return { success: true, user: formattedUser ?? undefined }; // Return formatted user or undefined
+      return { success: true, user: formattedUser ?? undefined };
     } catch (error: unknown) {
       console.error('Registration service error:', error);
-      // More specific error handling based on Prisma errors could be added
       return { success: false, message: error instanceof Error ? error.message : 'An error occurred during registration' };
     }
   }
