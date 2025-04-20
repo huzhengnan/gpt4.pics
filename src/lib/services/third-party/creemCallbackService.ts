@@ -53,14 +53,9 @@ export class CreemCallbackService {
       throw new Error('Invalid signature');
     }
 
-    // 验证产品ID
-    if (!params.product_id || !this.creemService.getProductById(params.product_id)) {
-      throw new Error('Invalid product ID');
-    }
-
     // 获取订单信息
     const order = await prisma.paymentOrder.findUnique({
-      where: { id: params.request_id || '' },
+      where: { orderNumber: params.order_id || '' },
       include: {
         plan: true,
       },
@@ -93,4 +88,4 @@ export class CreemCallbackService {
       ...result
     };
   }
-} 
+}
