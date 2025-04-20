@@ -2,6 +2,24 @@ import prisma from './index'
 import { CreditTransaction, CreditTransactionType } from '@prisma/client'
 
 export class CreditAccountRepository {
+  async createAccount(userId: string, initialBalance: number = 0): Promise<boolean> {
+    try {
+      console.log('Create credit account for user:', userId, 'Initial balance:', initialBalance);
+      await prisma.creditAccount.create({
+        data: {
+          userId,
+          balance: initialBalance,
+          totalEarned: initialBalance,
+          totalSpent: 0
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('Create credit account error:', error);
+      return false;
+    }
+  }
+
   async addCredits(userId: string, amount: number, description: string): Promise<{ success: boolean; transaction?: CreditTransaction }> {
     try {
       const result = await prisma.$transaction(async (tx) => {

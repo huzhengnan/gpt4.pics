@@ -50,15 +50,19 @@ export class UserRepository {
   }
 
   // 创建用户时确保包含 creditAccount
-  async create(data: UserCreateInput): Promise<(User & { creditAccount: { balance: number } | null })> { // Update return type hint
+  async create(data: UserCreateInput): Promise<(User & { creditAccount: { balance: number } | null })> {
     return prisma.user.create({
       data: {
         ...data,
         creditAccount: {
-          create: {} // 自动创建关联的 CreditAccount
+          create: {
+            balance: 50,
+            totalEarned: 50,
+            totalSpent: 0
+          }
         }
       },
-      include: this.includeCreditAccount // 返回时包含 creditAccount
+      include: this.includeCreditAccount
     });
   }
 

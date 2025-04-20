@@ -1,4 +1,5 @@
 import { UserRepository } from '../db/repositories/userRepository';
+import { CreditAccountRepository } from '../db/repositories/creditAccountRepository';
 // Import Prisma types directly if needed elsewhere, or rely on UserRepository's return types
 import type { User as PrismaUser } from '@prisma/client';
 import crypto from 'crypto';
@@ -52,9 +53,11 @@ type AuthResult = {
 
 export class UserService {
   private userRepo: UserRepository;
+  private creditAccountRepo: CreditAccountRepository;
 
   constructor() {
     this.userRepo = new UserRepository();
+    this.creditAccountRepo = new CreditAccountRepository();
   }
 
   // 密码哈希函数
@@ -94,34 +97,27 @@ export class UserService {
   // 用户注册方法 (返回 AuthResult)
   async register(data: RegisterInput): Promise<AuthResult> {
     try {
-       // Check if email or username already exists
-       const existingEmail = await this.userRepo.findByEmail(data.email);
-       if (existingEmail) {
-         return { success: false, message: 'Email already in use' };
-       }
-       const existingUsername = await this.userRepo.findByUsername(data.username);
-       if (existingUsername) {
-           return { success: false, message: 'Username already taken' };
-       }
+      // Check if email or username already exists
+      const existingEmail = await this.userRepo.findByEmail(data.email);
+      if (existingEmail) {
+        return { success: false, message: 'Email already in use' };
+      }
+      const existingUsername = await this.userRepo.findByUsername(data.username);
+      if (existingUsername) {
+        return { success: false, message: 'Username already taken' };
+      }
 
-      // Create user with initial credit account
+      // 创建用户（UserRepository 会自动创建带 50 积分的账户）
       const newUserFromRepo = await this.userRepo.create({
         email: data.email,
         username: data.username,
         passwordHash: this.hashPassword(data.password),
         avatarUrl: null,
         googleId: null,
-        githubId: null,
-        creditAccount: {
-          create: {
-            balance: 50,
-            totalEarned: 50
-          }
-        }
+        githubId: null
       });
 
       const formattedUser = this.formatUserWithBalance(newUserFromRepo);
-
       return { success: true, user: formattedUser ?? undefined };
     } catch (error: unknown) {
       console.error('Registration service error:', error);
