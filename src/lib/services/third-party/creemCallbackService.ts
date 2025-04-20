@@ -55,7 +55,7 @@ export class CreemCallbackService {
 
     // 获取订单信息
     const order = await prisma.paymentOrder.findUnique({
-      where: { id: params.order_id || '' },
+      where: { id: params.request_id || '' },
       include: {
         plan: true,
       },
