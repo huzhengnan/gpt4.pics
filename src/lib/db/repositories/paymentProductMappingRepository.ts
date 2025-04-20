@@ -1,5 +1,5 @@
+import { PaymentProductMapping, PaymentProvider } from '@prisma/client';
 import prisma from './index';
-import { PaymentProductMapping, PaymentProvider, Prisma } from '@prisma/client';
 
 export class PaymentProductMappingRepository {
   async findByPlanAndProvider(

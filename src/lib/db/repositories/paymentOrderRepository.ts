@@ -1,5 +1,5 @@
-import prisma from './index'
-import { OrderStatus, PaymentOrder, PricingPlan, Prisma } from '@prisma/client'
+import { OrderStatus, PaymentOrder, PricingPlan } from '@prisma/client';
+import prisma from './index';
 
 export type PaymentOrderWithPlan = PaymentOrder & {
   plan: PricingPlan | null;
