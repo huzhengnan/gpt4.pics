@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { PaymentOrderService } from '@/lib/services/payment/paymentOrderService';
+import { CreemService } from './creemService';
 
 export interface CreemRedirectParams {
   request_id?: string | null;
@@ -15,10 +16,12 @@ export interface CreemRedirectParams {
 export class CreemCallbackService {
   private readonly apiKey: string;
   private readonly paymentOrderService: PaymentOrderService;
+  private readonly creemService: CreemService;
 
   constructor() {
     this.apiKey = process.env.CREEM_API_KEY || '';
     this.paymentOrderService = new PaymentOrderService();
+    this.creemService = new CreemService();
     
     if (!this.apiKey) {
       throw new Error('CREEM_API_KEY is not set in environment variables');
@@ -51,7 +54,7 @@ export class CreemCallbackService {
     }
 
     // 验证产品ID
-    if (params.product_id !== process.env.CREEM_PRODUCT_ID) {
+    if (!params.product_id || !this.creemService.getProductById(params.product_id)) {
       throw new Error('Invalid product ID');
     }
 

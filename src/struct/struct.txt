@@ -22,6 +22,10 @@
 │   │   │   ├── migration.sql         # 数据库迁移 SQL
 │   │   ├── 20250417175131_update_schema_relations_indexes_enums/               # 
 │   │   │   ├── migration.sql         # 数据库迁移 SQL
+│   │   ├── 20250420083140_add_payment_product_mapping/               # 
+│   │   │   ├── migration.sql         # 数据库迁移 SQL
+│   │   ├── 20250420083141_add_payment_product_mapping_data/               # 
+│   │   │   ├── migration.sql         # 数据库迁移 SQL
 │   │   ├── migration_lock.toml   # Prisma 迁移锁定文件
 │   ├── schema.prisma         # Prisma 数据库模型定义
 ├── public/               # 静态资源目录
@@ -38,10 +42,15 @@
 │   │   │   │   │   ├── route.ts              # API 路由处理
 │   │   │   │   ├── register/               # 注册相关
 │   │   │   │   │   ├── route.ts              # API 路由处理
+│   │   │   ├── creem/               # 
+│   │   │   │   ├── callback/               # 
+│   │   │   │   │   ├── route.ts              # API 路由处理
 │   │   │   ├── generate-image/               # 图像生成相关
 │   │   │   │   ├── route.ts              # API 路由处理
 │   │   │   ├── payment/               # 
 │   │   │   │   ├── create-order/               # 
+│   │   │   │   │   ├── route.ts              # API 路由处理
+│   │   │   │   ├── webhook/               # 
 │   │   │   │   │   ├── route.ts              # API 路由处理
 │   │   │   ├── pricing-plans/               # 
 │   │   │   │   ├── route.ts              # API 路由处理
@@ -86,16 +95,22 @@
 │   │   │   │   ├── imageGenerationRepository.ts # 图像生成记录仓库
 │   │   │   │   ├── index.ts              # 模块导出文件
 │   │   │   │   ├── paymentOrderRepository.ts    # 支付订单仓库
+│   │   │   │   ├── paymentProductMappingRepository.ts
 │   │   │   │   ├── pricingPlanRepository.ts     # 价格方案仓库
 │   │   │   │   ├── userRepository.ts     # 用户数据仓库
+│   │   ├── prisma.ts
 │   │   ├── services/               # 服务层目录
 │   │   │   ├── authCookieService.ts         # 认证Cookie服务
 │   │   │   ├── couponService.ts             # 优惠券服务
 │   │   │   ├── imageGenerationService.ts    # 图像生成服务
+│   │   │   ├── payment/               # 
+│   │   │   │   ├── paymentOrderService.ts
 │   │   │   ├── paymentService.ts            # 支付服务
 │   │   │   ├── pricingService.ts            # 价格服务
 │   │   │   ├── third-party/               # 第三方服务集成
 │   │   │   │   ├── apiyiService.ts              # Apiyi API服务
+│   │   │   │   ├── creemCallbackService.ts
+│   │   │   │   ├── creemService.ts
 │   │   │   ├── userService.ts               # 用户服务
 │   ├── middleware/               # 中间件目录
 │   │   ├── auth.ts               # 认证中间件
@@ -109,3 +124,4 @@
 │   │   ├── image.ts              # 图像相关类型定义
 ├── tailwind.config.js    # Tailwind CSS 配置
 ├── tsconfig.json         # TypeScript 配置
+├── vercel.json

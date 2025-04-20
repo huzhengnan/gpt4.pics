@@ -2,12 +2,14 @@ import { PaymentOrderRepository } from '../db/repositories/paymentOrderRepositor
 import { PricingPlanRepository } from '../db/repositories/pricingPlanRepository';
 import { CouponRepository } from '../db/repositories/couponRepository';
 import { CouponUsageRepository } from '../db/repositories/couponUsageRepository';
+import { PaymentProductMappingRepository } from '../db/repositories/paymentProductMappingRepository';
 // Translate comment to English
 import { CreditAccountRepository } from '../db/repositories/creditAccountRepository'; // Used to add credits after successful purchase
 import { PaymentOrder, Prisma, OrderStatus, CreditTransactionType, CouponDiscountType } from '@prisma/client';
 import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { CreemService } from './third-party/creemService';
+import { OrderService } from './orderService';
 
 const prisma = new PrismaClient();
 
@@ -16,8 +18,10 @@ export class PaymentService {
   private planRepo: PricingPlanRepository;
   private couponRepo: CouponRepository;
   private couponUsageRepo: CouponUsageRepository;
-  private creditRepo: CreditAccountRepository; // Inject CreditAccountRepository
+  private creditRepo: CreditAccountRepository;
   private creemService: CreemService;
+  private paymentProductMappingRepo: PaymentProductMappingRepository;
+  private orderService: OrderService;
 
   constructor() {
     this.orderRepo = new PaymentOrderRepository();
@@ -27,6 +31,8 @@ export class PaymentService {
     // Translate comment to English
     this.creditRepo = new CreditAccountRepository(); // Initialize
     this.creemService = new CreemService();
+    this.paymentProductMappingRepo = new PaymentProductMappingRepository();
+    this.orderService = new OrderService();
   }
 
   async createPaymentOrder(userId: string, planId: string, couponCode?: string): Promise<{ order: PaymentOrder, finalAmount: Prisma.Decimal, paymentUrl: string }> {
@@ -104,11 +110,29 @@ export class PaymentService {
     }
 
     // 使用 CreemService 创建支付链接
-    const checkoutSession = await this.creemService.createCheckoutSession(order.id, {
-      userId,
-      orderId: order.id,
-      planId: plan.id
-    });
+    if (!order.planId) {
+      throw new Error('Plan ID is required');
+    }
+
+    // Get Creem product mapping
+    const productMapping = await this.paymentProductMappingRepo.findByPlanAndProvider(
+      order.planId,
+      'CREEM'
+    );
+
+    if (!productMapping) {
+      throw new Error('Payment product mapping not found');
+    }
+
+    const checkoutSession = await this.creemService.createCheckoutSession(
+      order.id,
+      productMapping.providerProdId, // Use the mapped product ID
+      {
+        userId: order.userId,
+        orderId: order.id,
+        planId: order.planId
+      }
+    );
 
     return { 
       order, 
@@ -118,17 +142,7 @@ export class PaymentService {
   }
 
   async handlePaymentSuccess(orderId: string, paymentId: string) {
-    const order = await prisma.paymentOrder.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.COMPLETED,
-        paymentId,
-        completedAt: new Date(),
-      },
-      include: {
-        plan: true,
-      },
-    });
+    const order = await this.orderService.updatePaymentInfo(orderId, paymentId);
 
     if (!order.plan) {
       throw new Error('Plan not found for order');
@@ -168,14 +182,14 @@ export class PaymentService {
   }
 
   async handlePaymentFailure(orderId: string) {
-    return this.orderRepo.updateStatus(orderId, OrderStatus.FAILED);
+    return this.orderService.updateStatus(orderId, OrderStatus.FAILED);
   }
 
   async getUserOrders(userId: string): Promise<PaymentOrder[]> {
-    return this.orderRepo.findByUserId(userId);
+    return this.orderService.findByUserId(userId);
   }
 
   async getOrderById(orderId: string): Promise<PaymentOrder | null> {
-    return this.orderRepo.findById(orderId);
+    return this.orderService.findById(orderId);
   }
 }

@@ -1,5 +1,9 @@
 import prisma from './index'
-import { OrderStatus, PaymentOrder } from '@prisma/client'
+import { OrderStatus, PaymentOrder, PricingPlan, Prisma } from '@prisma/client'
+
+export type PaymentOrderWithPlan = PaymentOrder & {
+  plan: PricingPlan | null;
+};
 
 export class PaymentOrderRepository {
   async create(data: Omit<PaymentOrder, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>): Promise<PaymentOrder> {
@@ -20,7 +24,7 @@ export class PaymentOrderRepository {
     })
   }
 
-  async updateStatus(id: string, status: OrderStatus, paymentId?: string): Promise<PaymentOrder> {
+  async updateStatus(id: string, status: OrderStatus, paymentId?: string): Promise<PaymentOrderWithPlan> {
     return prisma.paymentOrder.update({
       where: { id },
       data: { 
@@ -28,8 +32,11 @@ export class PaymentOrderRepository {
         paymentId,
         completedAt: status === OrderStatus.COMPLETED ? new Date() : null,
         updatedAt: new Date()
-       }
-    })
+      },
+      include: {
+        plan: true
+      }
+    });
   }
 
   async findByUserId(userId: string): Promise<PaymentOrder[]> {

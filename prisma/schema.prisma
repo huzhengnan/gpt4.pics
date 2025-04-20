@@ -94,6 +94,13 @@ model CreditTransaction {
   @@map("credit_transactions")
 }
 
+// Add payment provider enum
+enum PaymentProvider {
+  CREEM
+  STRIPE // Reserved for future use
+  PAYPAL // Reserved for future use
+}
+
 model PricingPlan {
   id          String         @id @default(uuid()) @db.Uuid
   name        String         @db.Text
@@ -103,8 +110,9 @@ model PricingPlan {
   isActive    Boolean        @default(true) @map("is_active")
   description String?        @db.Text
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz // Corrected: Use @updatedAt
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz
   orders      PaymentOrder[]
+  paymentProductMappings PaymentProductMapping[]
 
   @@map("pricing_plans")
 }
@@ -190,4 +198,22 @@ model ImageGeneration {
 
   @@index([userId]) // Added index
   @@map("image_generations")
+}
+
+// Add new model for payment product mapping
+model PaymentProductMapping {
+  id              String          @id @default(uuid()) @db.Uuid
+  pricingPlanId   String         @map("pricing_plan_id") @db.Uuid
+  provider        PaymentProvider
+  providerProdId  String         @map("provider_prod_id")
+  isActive        Boolean         @default(true) @map("is_active")
+  metadata        Json?          
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  pricingPlan     PricingPlan    @relation(fields: [pricingPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([pricingPlanId, provider])
+  @@index([provider, providerProdId])
+  @@map("payment_product_mappings")
 }
