@@ -25,6 +25,13 @@ export default function Footer() {
             >
               Privacy
             </a>
+            {/* Add Contact Link */}
+            <a 
+              href="mailto:huzhengnan@foxmail.com" 
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200"
+            >
+              Contact
+            </a>
           </div>
         </div>
       </div>

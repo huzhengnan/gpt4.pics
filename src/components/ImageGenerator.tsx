@@ -3,7 +3,7 @@
 // 1. Import useAuth
 import { useAuth } from '@/contexts/AuthContext'; // Import the hook
 import Image from 'next/image';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -24,7 +24,33 @@ const ImageGenerator = () => {
 
   // 2. Get refreshUser from useAuth
   const { refreshUser } = useAuth();
+  // Remove the unused generationId state
+  // const [generationId, setGenerationId] = useState<string | null>(null); 
+  const pollingIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
+  // Add polling function
+  const pollGenerationStatus = async (id: string) => {
+    try {
+      const response = await fetch(`/api/generate-image/status/${id}`);
+      const data = await response.json();
+
+      if (data.status === 'COMPLETED' && data.outputUrls?.[0]) {
+        setImageUrl(data.outputUrls[0]);
+        setHistory(prev => [...prev, { prompt, imageUrl: data.outputUrls[0] }]);
+        clearInterval(pollingIntervalRef.current);
+        setIsLoading(false);
+        await refreshUser();
+      } else if (data.status === 'FAILED') {
+        setError(data.errorMessage || 'Image generation failed');
+        clearInterval(pollingIntervalRef.current);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+    }
+  };
+
+  // Update handleSubmit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) {
@@ -34,6 +60,7 @@ const ImageGenerator = () => {
 
     setIsLoading(true);
     setError(null);
+    setImageUrl(null);
 
     try {
       const response = await fetch('/api/generate-image', {
@@ -45,44 +72,45 @@ const ImageGenerator = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        // Check specifically for insufficient credits error message from backend
-        if (data.error && data.error.toLowerCase().includes('insufficient credits')) {
-           setError('Insufficient credits to generate image.');
+        if (data.error?.toLowerCase().includes('insufficient credits')) {
+          setError('Insufficient credits to generate image.');
         } else {
-           throw new Error(data.error || 'Failed to generate image');
+          throw new Error(data.error || 'Failed to generate image');
         }
-        // Do not proceed further if response is not ok
-        return; 
+        return;
       }
 
-
-      if (data.data?.[0]?.url) {
-        const newImageUrl = data.data[0].url;
-        setImageUrl(newImageUrl);
-        setHistory(prev => [...prev, { prompt, imageUrl: newImageUrl }]);
-        
-        // 3. Refresh user data (including balance) after successful generation
-        try {
-          await refreshUser(); 
-        } catch (refreshError) {
-           // Optionally handle refresh errors, though AuthContext might handle its own errors
-           console.error("Failed to refresh user balance after generation:", refreshError);
-           // You might want to show a subtle notification here instead of a blocking error
-        }
-
-      } else {
-        throw new Error('No image data returned');
+      // Remove the unused state setter call
+      // setGenerationId(data.generationId);
+      
+      // Start polling
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
       }
+      
+      // Use data.generationId directly from the API response
+      pollingIntervalRef.current = setInterval(
+        () => pollGenerationStatus(data.generationId), 
+        2000
+      );
+
     } catch (err) {
       console.error('Image generation error:', err);
-      // Avoid setting error if already set (e.g., insufficient credits)
-      if (!error) { 
-         setError(err instanceof Error ? err.message : 'Error during image generation');
+      if (!error) {
+        setError(err instanceof Error ? err.message : 'Error during image generation');
       }
-    } finally {
       setIsLoading(false);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleDownload = () => {
     if (imageUrl) {
@@ -102,9 +130,23 @@ const ImageGenerator = () => {
           {/* Left Column - Input Form */}
           <div className="space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-gray-700">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-8">
-                Create Your Image
-              </h2>
+              <div className="flex items-center justify-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center">
+                  Create Your Image
+                </h2>
+                {/* Tooltip Icon */}
+                <div className="group relative ml-2">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0110 6a3 3 0 013 3 1 1 0 01-2 0 1 1 0 00-1-1zM9 12a1 1 0 112 0v1a1 1 0 11-2 0v-1z" clipRule="evenodd" />
+                  </svg>
+                  {/* Tooltip Content */}
+                  <div className="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none">
+                    <p>Costs 4 credits per image.</p>
+                    <p>Generation takes 20-40 seconds.</p>
+                    <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -194,6 +236,7 @@ const ImageGenerator = () => {
                           alt={`Generated image ${index + 1}`}
                           fill
                           className="object-cover rounded-lg"
+                          priority={index === 0}  // Add priority for first image
                         />
                       </div>
                       <div className="flex-grow">
@@ -218,9 +261,10 @@ const ImageGenerator = () => {
                   <div className="relative w-full aspect-square bg-gray-50 dark:bg-gray-700/50 rounded-xl overflow-hidden">
                     <Image 
                       src={imageUrl} 
-                      alt="Generated image" 
+                      alt="Generated image preview"
                       fill
                       className="object-contain"
+                      priority  // Add priority for preview image
                     />
                   </div>
                   <button

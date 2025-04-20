@@ -6,7 +6,6 @@ const imageService = new ImageGenerationService();
 
 export async function POST(request: NextRequest) {
   try {
-    // 获取并验证用户身份
     const token = await AuthCookieService.getAuthToken();
     if (!token) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -24,25 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Prompt cannot be empty" }, { status: 400 });
     }
 
-    // 使用解码后的token中的用户ID
     const userId = decodedToken.id;
-
-    // Correctly call the service layer method
     const result = await imageService.processImageGenerationRequest(userId, { prompt, size });
     
-    // Transform the response to match frontend expectations
     return NextResponse.json({
       success: true,
-      data: [{
-        url: result.data.url,
-        revised_prompt: result.data.revised_prompt
-      }],
-      created: result.created
+      generationId: result.generationId,
+      status: result.status
     });
-
-    // Service layer handles API call and DB operations
-    console.log("Image generation request processed successfully by service"); 
-    return NextResponse.json(result);
 
   } catch (error) {
     console.error('Image generation API route error:', error);
@@ -51,20 +39,53 @@ export async function POST(request: NextRequest) {
     let statusCode = 500;
 
     if (error instanceof Error) {
-      try {
-        const parsedError = JSON.parse(error.message);
-        errorMessage = parsedError.message || errorMessage;
-      } catch {
-        errorMessage = error.message;
-      }
-      
       if (error.message === 'Insufficient credits') {
         statusCode = 402;
+        errorMessage = error.message;
+      } else {
+        try {
+          const parsedError = JSON.parse(error.message);
+          errorMessage = parsedError.message || errorMessage;
+        } catch {
+          errorMessage = error.message;
+        }
       }
     }
 
-    return NextResponse.json({ 
-      error: errorMessage 
-    }, { status: statusCode });
+    return NextResponse.json({ error: errorMessage }, { status: statusCode });
   }
 }
+
+// Remove the incorrect GET handler entirely from this static route file.
+// The status checking GET request should be handled by
+// /Users/admin/WebstormProjects/gpt4/src/app/api/generate-image/status/[id]/route.ts
+/*
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } } // This signature is invalid here
+) {
+  try {
+    const token = await AuthCookieService.getAuthToken();
+    if (!token) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const generation = await imageService.getGenerationStatus(params.id);
+    if (!generation) {
+      return NextResponse.json({ error: "Generation not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      status: generation.status,
+      outputUrls: generation.outputUrls,
+      errorMessage: generation.errorMessage
+    });
+  } catch (error) {
+    console.error('Check generation status error:', error);
+    return NextResponse.json(
+      { error: 'Failed to check generation status' },
+      { status: 500 }
+    );
+  }
+}
+*/

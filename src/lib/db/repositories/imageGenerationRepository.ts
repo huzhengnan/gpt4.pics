@@ -11,19 +11,32 @@ export class ImageGenerationRepository {
     return prisma.imageGeneration.create({
       data: {
         ...data,
-        status: ImageGenerationStatus.PENDING
+        status: ImageGenerationStatus.PENDING,
+        outputUrls: []
       }
     })
   }
 
-  async updateStatus(id: string, status: ImageGenerationStatus, outputUrl?: string): Promise<ImageGeneration> {
+  async updateStatus(
+    id: string, 
+    status: ImageGenerationStatus, 
+    errorMessage?: string,
+    outputUrls?: string[]
+  ): Promise<ImageGeneration> {
     return prisma.imageGeneration.update({
       where: { id },
       data: {
         status,
-        outputUrls: outputUrl ? [outputUrl] : undefined,
-        completedAt: status === ImageGenerationStatus.COMPLETED ? new Date() : null
+        errorMessage,
+        outputUrls: outputUrls || undefined,
+        completedAt: status === ImageGenerationStatus.COMPLETED ? new Date() : undefined
       }
+    })
+  }
+
+  async findById(id: string): Promise<ImageGeneration | null> {
+    return prisma.imageGeneration.findUnique({
+      where: { id }
     })
   }
 

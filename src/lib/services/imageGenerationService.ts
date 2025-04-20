@@ -19,53 +19,73 @@ export class ImageGenerationService {
     // 检查积分余额
     const deductResult = await this.creditRepo.deductCredits(
       userId,
-      4, // 默认消耗1积分
-      `Generate image: ${request.prompt}` // Changed to English
+      4,
+      `Generate image: ${request.prompt}`
     )
 
     if (!deductResult.success) {
-      throw new Error('Insufficient credits') // Changed error message to English
+      throw new Error('Insufficient credits')
     }
 
-    // 创建图片生成记录
+    // 创建待处理的图片生成记录
     const generation = await this.imageRepo.create({
       userId,
       prompt: request.prompt,
       size: request.size || '1024x1024',
-      creditsUsed: 4
+      creditsUsed: 4,
+      // Remove status and outputUrls as they should be handled by the repository
     })
 
+    // 异步处理图片生成
+    this.processImageGeneration(generation.id, request).catch(error => {
+      console.error('Image generation processing error:', error)
+    })
+
+    // 立即返回生成记录
+    return {
+      success: true,
+      generationId: generation.id,
+      status: ImageGenerationStatus.PENDING
+    }
+  }
+
+  private async processImageGeneration(generationId: string, request: ImageGenerationRequest) {
     try {
+      // 更新状态为处理中
+      await this.imageRepo.updateStatus(
+        generationId,
+        ImageGenerationStatus.PROCESSING
+      )
+
       // 调用 Apiyi 服务生成图片
       const result = await this.apiyiService.generateImage(
         request.prompt,
         request.size || '1024x1024'
       )
 
-      // 更新图片生成记录
+      // 更新图片生成记录为完成状态
       await this.imageRepo.updateStatus(
-        generation.id,
+        generationId,
         ImageGenerationStatus.COMPLETED,
-        result.data[0].url
+        undefined,
+        [result.data[0].url]
       )
-
-      return {
-        success: true,
-        data: result.data[0],
-        created: result.created
-      }
     } catch (error) {
+      // 更新图片生成记录为失败状态
       await this.imageRepo.updateStatus(
-        generation.id,
+        generationId,
         ImageGenerationStatus.FAILED,
         error instanceof Error ? error.message : 'Unknown error'
       )
-      throw error
     }
   }
 
-  // Add proper return type and make it public
   public async processImageGenerationRequest(userId: string, request: ImageGenerationRequest) {
     return this.generateImage(userId, request)
+  }
+
+  // 新增：获取生成状态的方法
+  public async getGenerationStatus(generationId: string) {
+    return this.imageRepo.findById(generationId)
   }
 }
